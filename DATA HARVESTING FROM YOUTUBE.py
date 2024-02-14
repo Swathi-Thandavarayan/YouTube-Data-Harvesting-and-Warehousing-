@@ -1,11 +1,4 @@
-#Channel_details
-#channelID = "UC0EksOW58VrWUqsxse3Luyw",UCTQyLOlGgANsGz-afLp3NZQ = menu
-import pprint
-import googleapiclient.discovery
-from pymongo import MongoClient
-import mysql.connector
-import streamlit as st
-import pandas as pd
+
 apiID = 'AIzaSyCctqefK5Zza3Y8z-ca5I4-iGABMo-CaK8'
 api_service_name = "youtube"
 api_version = "v3"
