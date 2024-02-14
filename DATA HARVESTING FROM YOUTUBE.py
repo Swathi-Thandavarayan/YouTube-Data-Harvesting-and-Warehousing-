@@ -1,5 +1,5 @@
 
-apiID = 'AIzaSyCctqefK5Zza3Y8z-ca5I4-iGABMo-CaK8'
+apiID = your api key
 api_service_name = "youtube"
 api_version = "v3"
 youtube = googleapiclient.discovery.build(
