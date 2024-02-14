@@ -599,7 +599,8 @@ if selected_page == "CHANNEL DETAILS":
         st.dataframe(df)
 
 
-elif selected_page == "MONGODB":
+elif selected_page == "MONGODB": 
+
    channel_names = collection.distinct("Channel information.Channel_Name")
    options = ["Select All"] + channel_names
    selected_channel = st.sidebar.multiselect("Select a channel", options)
@@ -625,6 +626,7 @@ elif selected_page == "MONGODB":
 
     
 elif selected_page == "MYSQL":
+
     SQL_QUERIES()
     st.sidebar.markdown('''SQL queries are used to join the tables in the SQL data warehouse and 
                         retrieve data for specific channels based on user input. 
