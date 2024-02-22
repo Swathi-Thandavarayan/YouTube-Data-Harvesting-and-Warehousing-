@@ -1,4 +1,3 @@
-
 apiID = your api key
 api_service_name = "youtube"
 api_version = "v3"
@@ -405,7 +404,7 @@ st.set_page_config(
 
 st.title("YouTube Data Harvesting and Warehousing using SQL, MongoDB and Streamlit")
 st.markdown("Welcome to project YDHW_by Swathi:smile:")
-st.markdown("The app that helps you to retrieve and analyse data from various Youtube , responding to various queries. ")
+st.markdown("The app that helps you to retrieve and analyse data from various Youtube Channels and its response to various queries. ")
 selected_page = st.sidebar.selectbox("Select Page", ["CHANNEL DETAILS", "MONGODB","MYSQL"])
 
 def SQL_QUERIES():
@@ -429,6 +428,7 @@ def SQL_QUERIES():
             results = cursor.fetchall()
             df = pd.DataFrame(results, columns=['VideoName', 'channel_name'])
             df = df.sort_values(by='channel_name')
+           # df = df.style.hide_index()
             st.dataframe(df)
             
         elif queries == "2.Which channels have the most number of videos, and how many videos do they have?":
@@ -597,25 +597,43 @@ elif selected_page == "MONGODB":
    channel_names = collection.distinct("Channel information.Channel_Name")
    options = ["Select All"] + channel_names
    selected_channel = st.sidebar.multiselect("Select a channel", options)
-   
+
+   st.sidebar.markdown('''Multiple Channels can be selected from the options to migrate data to MYSQL, 
+                        to migrate all the Channels select (SELECT ALL)''')
+   st.sidebar.markdown('''Selected channels will be viewed after uploading for you reference''')
+   st.sidebar.markdown('''Once the data is retrieved from the YouTube API,
+                It is stored in MongoDB data lake. 
+            MongoDB is a great choice for a data lake because it can handle unstructured and semi-structured data easily,
+            plus Data retrieval is rapid.The processed data is migrated to Mysql to a structured form''')
+
    if st.sidebar.button('Upload Selected Options to Mysql'):
     if "Select All" in selected_channel:
         selected_channel.remove("Select All")
         sqltables()
         st.sidebar.write("upload successfull")
     
-    if selected_channel in options:
-            # Modify the query to get data based on the selected option
-            sqltables()
+    if  selected_channel:
+        sqltables()
+        st.sidebar.write("upload successfull")
 
-        
-    st.sidebar.markdown('''Multiple Channels can be selected from the options to migrate data to MYSQL, 
-                        to migrate all select (SELECT ALL)''')
-    st.sidebar.markdown('''Selected channels will be viewed after uploading for you reference''')
-    st.sidebar.markdown('''Once the data is retrieved from the YouTube API,
-                 It is store it in a MongoDB data lake. 
-                MongoDB is a great choice for a data lake because it can handle unstructured and semi-structured data easily,
-                plus Data retrieval is rapid.The processed data is migrated to Mysql to a structured form''')
+   col1, col2 = st.columns(2)
+   with col1:
+    st.write("MONGODB DATA:")
+    channels_list = []
+    for data in collection.find({}, {"_id": 0, "Channel information": 1}):
+            channels_list.append(data["Channel information"])
+
+    df_channels = pd.DataFrame(channels_list)
+    st.dataframe(df_channels['Channel_Name'])
+
+   with col2:
+    st.write("MYSQL DATA:")
+    data = '''SELECT Channel_Name FROM channels'''
+    cursor.execute(data)
+    results = cursor.fetchall()
+    df = pd.DataFrame(results)
+    st.dataframe(df)    
+   
 
     
 elif selected_page == "MYSQL":
