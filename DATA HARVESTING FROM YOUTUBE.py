@@ -19,18 +19,16 @@ def  Channel_information(Channel_Id):
     )
     response = request.execute()
 
-
-    for i in range(0,len(response)):
-        Channel_data_for_video = {"Channel_Name":response['items'][0]['snippet']['title'],
-                        "Channel_Id":response['items'][0]['id'],
-                        "Subscription_Count":response['items'][0]['statistics']['subscriberCount'],
-                        "Channel_views":response['items'][0]['statistics']['viewCount'],
-                        "Channel_Discription":response['items'][0]['snippet']['description'],
-                        "playlist_Id":response['items'][0]['contentDetails']['relatedPlaylists']['uploads'],
-                        "videos_count":response['items'][0]['statistics']['videoCount'],
-                        "channel_status":response['items'][0]['status']['privacyStatus']}
-
-
+    Channel_data_for_video = {"Channel_Name":response['items'][0]['snippet']['title'],
+                    "Channel_Id":response['items'][0]['id'],
+                    "Subscription_Count":response['items'][0]['statistics']['subscriberCount'],
+                    "Channel_views":response['items'][0]['statistics']['viewCount'],
+                    "Channel_Discription":response['items'][0]['snippet']['description'],
+                    "playlist_Id":response['items'][0]['contentDetails']['relatedPlaylists']['uploads'],
+                    "videos_count":response['items'][0]['statistics']['videoCount'],
+                    "channel_status":response['items'][0]['status']['privacyStatus']}
+     
+    
     #upload_playlist_Id
     playlist_Id = Channel_data_for_video.get('playlist_Id')
     
@@ -106,8 +104,8 @@ def  Channel_information(Channel_Id):
                         "Comment_PublishedAt": comment['snippet']['topLevelComment']['snippet'].get('publishedAt')
                     }
                     videos_details["Comments"].append(comment_info)
-            except:
-                None
+            except Exception as e:
+                print(f"An error occurred: {e}")
             videos_list.append(videos_details)
 
 
@@ -131,279 +129,15 @@ config = {
 connection = mysql.connector.connect(**config)
 cursor = connection.cursor()
 
-def sqltables():
-
-     # Drop and create the MySQL playlist table
-    drop_playlist_query = '''DROP TABLE IF EXISTS playlist'''
-    cursor.execute(drop_playlist_query)
-    connection.commit()
-
-
-     # Drop and create the MySQL channels table
-    drop_channels_query = '''DROP TABLE IF EXISTS channels'''
-    cursor.execute(drop_channels_query)
-    connection.commit()
-
-    create_channels_query = '''CREATE TABLE channels (
-                                    Channel_Name VARCHAR(255),
-                                    Channel_Id VARCHAR(255) PRIMARY KEY,
-                                    Subscription_Count INT,
-                                    Channel_views INT,
-                                    Channel_Discription TEXT,
-                                    playlist_Id VARCHAR(255),
-                                    videos_count INT,
-                                    channel_status VARCHAR(255)
-                                )'''
-    cursor.execute(create_channels_query)
-    connection.commit()
-
-    # Extract data from MongoDB for channels
-    channels_list = []
-    for data in collection.find({}, {"_id": 0, "Channel information": 1}):
-        channels_list.append(data["Channel information"])
-
-    df_channels = pd.DataFrame(channels_list)
-
-    # Insert data into MySQL channels table
-    for index, row in df_channels.iterrows():
-        insert_channels_query = '''INSERT INTO channels (
-                                        Channel_Name,
-                                        Channel_Id,
-                                        Subscription_Count,
-                                        Channel_views,
-                                        Channel_Discription,
-                                        playlist_Id,
-                                        videos_count,
-                                        channel_status
-                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'''
-        
-        values_channels = (row['Channel_Name'], 
-                        row['Channel_Id'], 
-                        row['Subscription_Count'], 
-                        row['Channel_views'], 
-                        row['Channel_Discription'], 
-                        row['playlist_Id'], 
-                        row['videos_count'], 
-                        row['channel_status'])
-        
-        try:
-            cursor.execute(insert_channels_query, values_channels)
-            connection.commit()
-        except Exception as e:
-            print(f"Error executing query: {e}")
-
-
-   
-
-    create_playlist_query = '''CREATE TABLE playlist (
-                                    Channel_Id VARCHAR(255) PRIMARY KEY,
-                                    Channel_Name VARCHAR(255),
-                                    playlist_Id VARCHAR(255)
-                                    
-                                )'''
-    cursor.execute(create_playlist_query)
-    connection.commit()
-
-    # Extract data from MongoDB for playlist
-    playlist_list = []
-    for data in collection.find({}, {"_id": 0, "playlist": 1}):
-        
-        playlist_list.append(data["playlist"])
-
-    df_playlist = pd.DataFrame(playlist_list)
-
-    # Insert data into MySQL playlist table
-    for index, row in df_playlist.iterrows():
-        insert_playlist_query = '''INSERT INTO playlist (
-                                        Channel_Id,
-                                        Channel_Name,
-                                        playlist_Id
-                                    ) VALUES (%s, %s, %s)'''
-        
-        values_playlist = (row['Channel_Id'], 
-                        row['Channel_Name'],
-                        row['playlist_Id'])
-        
-        try:
-            cursor.execute(insert_playlist_query, values_playlist)
-            connection.commit()
-        except:
-            print("Already executed")
-
-    # drop table if exists videos table
-    drop_video_query = '''DROP TABLE IF EXISTS videos'''
-    cursor.execute(drop_video_query)
-    connection.commit()
-
-    # create table in MySQL videos table
-    create_videos_query = '''CREATE TABLE videos (
-        video_Name VARCHAR(255),
-        channel_name VARCHAR(255),
-        video_id VARCHAR(255) PRIMARY KEY,
-        Video_Description TEXT,
-        Tags TEXT,
-        PublishedAt TIMESTAMP,
-        View_Count BIGINT,
-        Like_Count BIGINT,
-        Favorite_Count INT,
-        Comment_Count INT,
-        Duration BIGINT,
-        Thumbnails VARCHAR(255),
-        Caption_Status VARCHAR(20),
-        Comments TEXT
-        
-    )'''
-    cursor.execute(create_videos_query)
-    connection.commit()
-
-    # extract data from MongoDB videos table
-    video_list = []
-    for video_data in collection.find({}, {"_id": 0, "videos": 1}):
-        if 'videos' in video_data and isinstance(video_data['videos'], list):
-            video_list.extend(video_data["videos"])
-
-    df_videos = pd.DataFrame(video_list)
-    df_videos['PublishedAt'] = pd.to_datetime(df_videos['PublishedAt'], format='%Y-%m-%dT%H:%M:%SZ', errors='coerce')
-
-
-    def convert_duration(Duration):
-        if pd.notnull(Duration):
-            Duration = Duration.upper()  
-            seconds = 0
-            seconds_min = 0  
-
-            if 'PT' in Duration:
-                Duration = Duration[2:]  # Remove 'PT'
-
-            if 'M' in Duration:
-                try:
-                    minutes = int(Duration.split('M')[0])
-                    seconds_min = minutes * 60
-                    
-                except ValueError:
-                    pass  
-
-            if 'S' in Duration:
-                
-                if 'M' in Duration:
-                            Duration = Duration.split('M')[1]
-                            seconds = int(Duration.split('S')[0])
-                
-                else:
-                    seconds = int(Duration.split('S')[0])
-
-
-        result = seconds_min + seconds
-        
-        return result
-
-    df_videos['Duration'] = df_videos['Duration'].apply(convert_duration)
-
-    # Convert the list columns to strings
-    df_videos['Comments'] = df_videos['Comments'].apply(lambda x: ', '.join(map(str, x)) if x else '')
-    df_videos['Tags'] = df_videos['Tags'].apply(lambda x: ', '.join(map(str, x)) if x else '')
-
-
-
-    # insert to MySQL videos table
-    for index, row in df_videos.iterrows():
-        insert_query_videos = '''INSERT INTO videos (
-            video_Name,
-            channel_name,
-            video_id,
-            Video_Description,
-            Tags,
-            PublishedAt,
-            View_Count,
-            Like_Count,
-            Favorite_Count,
-            Comment_Count,
-            Duration,
-            Thumbnails,
-            Caption_Status,
-            Comments
-        ) VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
-
-        values_videos = (
-            row['video_Name'],
-            row['channel_name'],
-            row['video_id'],
-            row['Video_Description'],
-            row['Tags'],
-            row['PublishedAt'],
-            row['View_Count'],
-            row['Like_Count'],
-            row['Favorite_Count'],
-            row['Comment_Count'],
-            row['Duration'],
-            row['Thumbnail'],
-            row['Caption_Status'],
-            row['Comments']
-        )
-
-        try:
-            cursor.execute(insert_query_videos, values_videos)
-            connection.commit()
-        
-        except Exception as e:
-            print(f"Error: {e}")
-
-        # Drop and create the MySQL comments table
-    drop_query = '''DROP TABLE IF EXISTS comments'''
-    cursor.execute(drop_query)
-    connection.commit()
-
-    create_comments_query = '''CREATE TABLE comments (
-                            comment_id VARCHAR(255) PRIMARY KEY,
-                            comment_text text,
-                            comment_author VARCHAR(255),
-                            comment_publishedat text
-                        )'''
-    cursor.execute(create_comments_query)
-    connection.commit()
-
-    #extract data from Mongodb for comments
-    comments_list = []
-    for channel_data in collection.find({}, {"_id": 0, "videos": 1}):
-        for video_entry in channel_data.get("videos", []):
-            for comment_data in video_entry.get("Comments", []):
-                comments_list.append(comment_data)
-
-    df = pd.DataFrame(comments_list)
-    for index,row in df.iterrows():
-            
-            insert_query = '''INSERT INTO comments(comment_id,
-                                                comment_text ,
-                                                comment_author ,
-                                                comment_publishedat
-                                                ) VALUES(%s,%s,%s,%s)'''   
-            
-            values = (row['Comment_id'],
-                    row['Comment_Text'],
-                    row['Comment_Author'],
-                    row['Comment_PublishedAt']
-                    )
-            try:
-                    cursor.execute(insert_query,values)
-                    connection.commit()
-
-            
-            except Exception as e:
-                print(f"Error: {e}")
-
-
-
 ## STREAMLIT
 st.set_page_config(
     page_title="YouTube Data Harvesting and Warehousing using SQL, MongoDB and Streamlit",
     page_icon="🔗",
-    layout="wide",  # "wide" or "centered"
-    initial_sidebar_state="collapsed"  # "auto" or "expanded" or "collapsed"
-    
-)
+    layout="wide",  # wide or centered
+    initial_sidebar_state="collapsed")  # auto or expanded or collapsed
 
 st.title("YouTube Data Harvesting and Warehousing using SQL, MongoDB and Streamlit")
-st.markdown("Welcome to project YDHW_by Swathi:smile:")
+st.markdown("Welcome to project YDHW_by Swathi")
 st.markdown("The app that helps you to retrieve and analyse data from various Youtube Channels and its response to various queries. ")
 selected_page = st.sidebar.selectbox("Select Page", ["CHANNEL DETAILS", "MONGODB","MYSQL"])
 
@@ -526,6 +260,279 @@ def insert_data(channel_id):
         # Document doesn't exist, insert new data
         Channel_information(channel_id)
         st.success(f"Data for channel_id {channel_id} successfully uploaded to MongoDB.")
+def sqltables(channel):
+
+    try:
+        create_channels_query = '''CREATE TABLE channels (
+                                        Channel_Name VARCHAR(255),
+                                        Channel_Id VARCHAR(255) PRIMARY KEY,
+                                        Subscription_Count INT,
+                                        Channel_views INT,
+                                        Channel_Discription TEXT,
+                                        playlist_Id VARCHAR(255),
+                                        videos_count INT,
+                                        channel_status VARCHAR(255)
+                                    )'''
+        cursor.execute(create_channels_query)
+        connection.commit()
+    except :
+        pass
+    
+
+    # Extract data from MongoDB for channels
+    channels_list = []
+    for data in collection.find({}, {"_id": 0, "Channel information": 1}):
+        channels_list.append(data["Channel information"])
+
+    df_channels = pd.DataFrame(channels_list)
+
+    # Insert data into MySQL channels table
+    for index, row in df_channels.iterrows():
+        insert_channels_query = '''INSERT INTO channels (
+                                        Channel_Name,
+                                        Channel_Id,
+                                        Subscription_Count,
+                                        Channel_views,
+                                        Channel_Discription,
+                                        playlist_Id,
+                                        videos_count,
+                                        channel_status
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'''
+        
+        values_channels = (row['Channel_Name'], 
+                        row['Channel_Id'], 
+                        row['Subscription_Count'], 
+                        row['Channel_views'], 
+                        row['Channel_Discription'], 
+                        row['playlist_Id'], 
+                        row['videos_count'], 
+                        row['channel_status'])
+        
+        try:
+            cursor.execute(insert_channels_query, values_channels)
+            connection.commit()
+        except :
+            pass
+
+    try:
+        create_playlist_query = '''CREATE TABLE playlist (
+                                        Channel_Id VARCHAR(255) PRIMARY KEY,
+                                        Channel_Name VARCHAR(255),
+                                        playlist_Id VARCHAR(255)
+                                        
+                                    )'''
+        cursor.execute(create_playlist_query)
+        connection.commit()
+    except:
+        pass
+
+    # Extract data from MongoDB for playlist
+    playlist_list = []
+    for data in collection.find({}, {"_id": 0, "playlist": 1}):
+        
+        playlist_list.append(data["playlist"])
+
+    df_playlist = pd.DataFrame(playlist_list)
+
+    # Insert data into MySQL playlist table
+    for index, row in df_playlist.iterrows():
+        insert_playlist_query = '''INSERT INTO playlist (
+                                        Channel_Id,
+                                        Channel_Name,
+                                        playlist_Id
+                                    ) VALUES (%s, %s, %s)'''
+        
+        values_playlist = (row['Channel_Id'], 
+                        row['Channel_Name'],
+                        row['playlist_Id'])
+        
+        try:
+            cursor.execute(insert_playlist_query, values_playlist)
+            connection.commit()
+        except:
+            pass
+
+     # create table in MySQL videos table
+    try:
+        create_videos_query = '''CREATE TABLE videos (
+            video_Name VARCHAR(255),
+            channel_name VARCHAR(255),
+            video_id VARCHAR(255) PRIMARY KEY,
+            Video_Description TEXT,
+            Tags TEXT,
+            PublishedAt TIMESTAMP,
+            View_Count BIGINT,
+            Like_Count BIGINT,
+            Favorite_Count INT,
+            Comment_Count INT,
+            Duration BIGINT,
+            Thumbnails VARCHAR(255),
+            Caption_Status VARCHAR(20),
+            Comments TEXT
+            
+        )'''
+        cursor.execute(create_videos_query)
+        connection.commit()
+    except:
+        pass
+
+    # extract data from MongoDB videos table
+    video_list = []
+    for video_data in collection.find({}, {"_id": 0, "videos": 1}):
+        if 'videos' in video_data and isinstance(video_data['videos'], list):
+            video_list.extend(video_data["videos"])
+
+    df_videos = pd.DataFrame(video_list)
+    df_videos['PublishedAt'] = pd.to_datetime(df_videos['PublishedAt'], format='%Y-%m-%dT%H:%M:%SZ', errors='coerce')
+
+
+    def convert_duration(Duration):
+        if pd.notnull(Duration):
+            Duration = Duration.upper()  
+            seconds = 0
+            seconds_min = 0  
+
+            if 'PT' in Duration:
+                Duration = Duration[2:]  # Remove 'PT'
+
+            if 'H' in Duration:
+                try:
+                    Duration = Duration.split('H')
+                    seconds_min = int(Duration[0])*60
+                    seconds =int(Duration[1])
+                except ValueError:
+                    pass 
+
+            if 'M' in Duration:
+                try:
+                    minutes = int(Duration.split('M')[0])
+                    seconds_min = minutes * 60
+                    
+                except ValueError:
+                    pass  
+
+            if 'S' in Duration:
+                try:
+                    if 'M' in Duration:
+                                Duration = Duration.split('M')[1]
+                                seconds = int(Duration.split('S')[0])
+                    
+                    else:
+                        seconds = int(Duration.split('S')[0])
+                except ValueError:
+                    pass 
+
+        result = seconds_min + seconds
+        
+        return result
+
+    df_videos['Duration'] = df_videos['Duration'].apply(convert_duration)
+
+    # Convert the list columns to strings
+    df_videos['Comments'] = df_videos['Comments'].apply(lambda x: ', '.join(map(str, x)) if x else '')
+    df_videos['Tags'] = df_videos['Tags'].apply(lambda x: ', '.join(map(str, x)) if x else '')
+
+
+
+    # insert to MySQL videos table
+    for index, row in df_videos.iterrows():
+        insert_query_videos = '''INSERT INTO videos (
+            video_Name,
+            channel_name,
+            video_id,
+            Video_Description,
+            Tags,
+            PublishedAt,
+            View_Count,
+            Like_Count,
+            Favorite_Count,
+            Comment_Count,
+            Duration,
+            Thumbnails,
+            Caption_Status,
+            Comments
+        ) VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+
+        values_videos = (
+            row['video_Name'],
+            row['channel_name'],
+            row['video_id'],
+            row['Video_Description'],
+            row['Tags'],
+            row['PublishedAt'],
+            row['View_Count'],
+            row['Like_Count'],
+            row['Favorite_Count'],
+            row['Comment_Count'],
+            row['Duration'],
+            row['Thumbnail'],
+            row['Caption_Status'],
+            row['Comments']
+        )
+
+        try:
+            cursor.execute(insert_query_videos, values_videos)
+            connection.commit()
+        
+        except :
+            pass
+    
+    try:
+        create_comments_query = '''CREATE TABLE comments (
+                                comment_id VARCHAR(255) PRIMARY KEY,
+                                comment_text text,
+                                comment_author VARCHAR(255),
+                                comment_publishedat text
+                            )'''
+        cursor.execute(create_comments_query)
+        connection.commit()
+    except:
+        pass
+    
+    #extract data from Mongodb for comments
+    comments_list = []
+    for channel_data in collection.find({}, {"_id": 0, "videos": 1}):
+        for video_entry in channel_data.get("videos", []):
+            for comment_data in video_entry.get("Comments", []):
+                comments_list.append(comment_data)
+
+    df = pd.DataFrame(comments_list)
+    for index,row in df.iterrows():
+            
+            insert_query = '''INSERT INTO comments(comment_id,
+                                                comment_text ,
+                                                comment_author ,
+                                                comment_publishedat
+                                                ) VALUES(%s,%s,%s,%s)'''   
+            
+            values = (row['Comment_id'],
+                    row['Comment_Text'],
+                    row['Comment_Author'],
+                    row['Comment_PublishedAt']
+                    )
+            try:
+                    cursor.execute(insert_query,values)
+                    connection.commit()
+
+            
+            except:
+                pass
+def Drop_tables():
+    drop_channels_query = '''DROP TABLE IF EXISTS channels'''
+    cursor.execute(drop_channels_query)
+    connection.commit()
+
+    drop_playlist_query = '''DROP TABLE IF EXISTS playlist'''
+    cursor.execute(drop_playlist_query)
+    connection.commit()
+
+    drop_video_query = '''DROP TABLE IF EXISTS videos'''
+    cursor.execute(drop_video_query)
+    connection.commit()
+
+    drop_query = '''DROP TABLE IF EXISTS comments'''
+    cursor.execute(drop_query)
+    connection.commit()
 
 
 if selected_page == "CHANNEL DETAILS":
@@ -609,18 +616,25 @@ elif selected_page == "MONGODB":
    if st.sidebar.button('Upload Selected Options to Mysql'):
     if "Select All" in selected_channel:
         selected_channel.remove("Select All")
-        sqltables()
+        sqltables(selected_channel)
         st.sidebar.write("upload successfull")
     
     if  selected_channel:
-        sqltables()
-        st.sidebar.write("upload successfull")
+           # Drop_tables()
+            with st.spinner("Uploading data to MySQL..."):
+                  for channel in selected_channel:
+                    sqltables(channel)
+                  st.sidebar.write("Upload successful for selected channels.")
+    
+    #sqltables()
+    #st.sidebar.write("upload successfull")
+        
 
    col1, col2 = st.columns(2)
    with col1:
     st.write("MONGODB DATA:")
     channels_list = []
-    for data in collection.find({}, {"_id": 0, "Channel information": 1}):
+    for data in collection.find({},{"_id": 0, "Channel information": 1}):
             channels_list.append(data["Channel information"])
 
     df_channels = pd.DataFrame(channels_list)
