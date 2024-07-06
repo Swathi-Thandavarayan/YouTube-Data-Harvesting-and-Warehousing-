@@ -52,6 +52,6 @@ Python
 Google API (YouTube Data API)
 MongoDB
 MySQL
-Streamlit
+Streamlit.
 
 
