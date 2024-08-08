@@ -6,7 +6,7 @@ This project aims to harvest data from YouTube using the YouTube Data API, proce
 - Features
 - Prerequisites
 - Installation
-- Configuration
+- Configuration.
 - Usage
 - Technologies Used
 
